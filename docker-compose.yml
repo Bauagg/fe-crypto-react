@@ -1,0 +1,50 @@
+# Frontend React (Vite) — disajikan Nginx di port 8080 dalam container, dijangkau Nginx Proxy Manager
+# lewat network `proxy-net` (Forward Hostname = nama container, port 8080).
+#
+# Variabel VITE_* ditanam ke bundle saat BUILD, jadi harus ada sebelum build. File `.env` di folder
+# yang sama (ditulis CI/CD saat deploy, atau manual di laptop):
+#   VITE_API_URL     mis. https://api.domainmu.com/api
+#   VITE_WS_URL      mis. wss://api.domainmu.com/api/
+#   IMAGE_TAG        tag image GHCR (dev: sha-xxxxxxx, prod: v1.2.3)
+#   CONTAINER_PREFIX awalan nama container (dev: treding, prod: treding-prod)
+#   WEB_PORT_HOST    port di 127.0.0.1 VPS untuk debug (dev: 3000, prod: 3001)
+#
+# Laptop: network dibuat sekali, lalu build lokal:
+#   docker network create proxy-net
+#   docker compose up -d --build
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:?isi VITE_API_URL di .env}
+        VITE_WS_URL: ${VITE_WS_URL:?isi VITE_WS_URL di .env}
+    image: ghcr.io/bauagg/treding-view-chart:${IMAGE_TAG:-dev}
+    container_name: ${CONTAINER_PREFIX:-treding}-web
+    restart: unless-stopped
+    # Port host hanya di 127.0.0.1 (untuk curl/debug). Nginx Proxy Manager lewat proxy-net.
+    ports:
+      - "127.0.0.1:${WEB_PORT_HOST:-3000}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging: *default-logging
+    networks: [proxy-net]
+
+networks:
+  proxy-net:
+    name: proxy-net
+    external: true

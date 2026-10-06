@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+.git
+.claude
+.env
+.env.*
+!.env.example
+*.log
+README.md
+Dockerfile
+docker-compose.yml
